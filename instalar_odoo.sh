@@ -8,9 +8,6 @@ BRANCH="18.0"
 # 1. Preparar el sistema
 echo "--- Preparando directorios y usuario ---"
 sudo adduser --system --quiet --shell=/bin/bash --home=/opt/odoo --gecos 'odoo' --group odoo
-sudo usermod -g odoo jnmar
-cd /home/jnmar
-./.bashrc
 sudo mkdir -p /etc/odoo /var/log/odoo "$DIR_BASE"
 sudo apt update && sudo apt install -y git postgresql
 
@@ -38,7 +35,6 @@ fi
 echo "--- Ajustando permisos ---"
 sudo chown -R odoo:odoo /opt/odoo
 sudo chown -R odoo:odoo /var/log/odoo
-sudo chmod -R 775 /opt/odoo/odoo
+sudo chmod -R 775 /opt/odoo/
 
 echo "¡Proceso finalizado!"
-Usa el código con precaución.
