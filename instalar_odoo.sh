@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configuración
-LISTA_REPOS="/opt/odoo/odooinstall/reposoca.txt"
+LISTA_REPOS="./odooinstall/reposoca.txt"
 DIR_BASE="/opt/odoo/oca"
 BRANCH="18.0"
 
