@@ -24,6 +24,9 @@
 	echo "Indique el Puerto Longpolling (Sugerido: 8072 para v18, 9072 para v19):"
 	read -p "PUERTO CHAT: " ODOO_CHAT_PORT
 	ODOO_CHAT_PORT=${ODOO_CHAT_PORT:-8072}
+	
+	# Dominio para nginx
+	DOMAIN="gdigital.loc"
 
 # 3. Definición de la nueva estructura
 	BASE_INSTANCIA="/opt/odoo/odoo$BRANCH"
@@ -150,6 +153,8 @@ sudo apt install -y python3-venv python3-dev build-essential libxml2-dev libxslt
 [options]
 db_user = odoo
 http_port = $ODOO_PORT
+proxy_mode = True
+dbfilter = ^%d$
 longpolling_port = $ODOO_CHAT_PORT
 addons_path = $ADDONS_PATH
 logfile = $LOG_DIR/$SERVICE_NAME.log
@@ -194,7 +199,109 @@ sudo systemctl daemon-reload
 sudo systemctl enable "$SERVICE_NAME"
 sudo systemctl start "$SERVICE_NAME"
 
+# --- SECCIÓN 18: INSTALACIÓN Y CONFIGURACIÓN DE NGINX ---
+echo "--- Configurando Nginx para Odoo $BRANCH ---"
 
+# Instalar Nginx si no está presente
+sudo apt update && sudo apt install -y nginx
+
+NGINX_CONF="/etc/nginx/sites-available/odoo$BRANCH"
+
+# Crear el archivo de configuración con comodines para subdominios
+sudo bash -c "cat > $NGINX_CONF <<EOF
+upstream odoo$BRANCH-backend {
+    server 127.0.0.1:$ODOO_PORT;
+}
+upstream odoo$BRANCH-chat {
+    server 127.0.0.1:$ODOO_CHAT_PORT;
+}
+
+server {
+    listen 80;
+    # Acepta cualquier subdominio para esta versión (ej: cliente1.v18.gdigital.loc)
+    server_name *.v$BRANCH.$DOMAIN;
+
+    proxy_read_timeout 720s;
+    proxy_connect_timeout 720s;
+    proxy_send_timeout 720s;
+    client_max_body_size 128M;
+
+    # Registro de logs específicos por versión
+    access_log /var/log/nginx/odoo$BRANCH.access.log;
+    error_log /var/log/nginx/odoo$BRANCH.error.log;
+
+    # Longpolling (Chat/Bus)
+    location /longpolling {
+        proxy_pass http://odoo$BRANCH-chat;
+    }
+
+    # Redirección al Odoo Core
+    location / {
+        proxy_set_header X-Forwarded-Host \$host;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_redirect off;
+        proxy_pass http://odoo$BRANCH-backend;
+    }
+
+    # Caché de archivos estáticos para rendimiento
+    location ~* /web/static/ {
+        proxy_cache_valid 200 90m;
+        proxy_buffering on;
+        expires 864000;
+        proxy_pass http://odoo$BRANCH-backend;
+    }
+}
+EOF"
+
+# Activar la configuración y limpiar el default de Nginx
+sudo ln -sf "$NGINX_CONF" "/etc/nginx/sites-enabled/"
+sudo rm -f /etc/nginx/sites-enabled/default
+
+# Verificar sintaxis y reiniciar
+sudo nginx -t && sudo systemctl restart nginx
+
+echo "--- Nginx configurado: Accede por *.v$BRANCH.$DOMAIN ---"
+
+# --- SECCIÓN 19: VALIDACIÓN FINAL DE LA INSTALACIÓN ---
+echo -e "\n Verificando servicios y puertos..."
+
+# 19.1. Comprobar Servicios de Sistema
+servicios=("postgresql" "nginx" "odoo$BRANCH")
+for s in "${servicios[@]}"; do
+    if systemctl is-active --quiet "$s"; then
+        echo "   [OK] Servicio $s: ACTIVO"
+    else
+        echo "   [!] Servicio $s: CAÍDO (Revisa 'systemctl status $s')"
+    fi
+done
+
+# 19.2. Comprobar Puertos de Red
+puertos=("$ODOO_PORT" "$ODOO_CHAT_PORT" "80")
+for p in "${puertos[@]}"; do
+    if sudo ss -tulpn | grep -q ":$p "; then
+        echo "   [OK] Puerto $p: ESCUCHANDO"
+    else
+        echo "   [!] Puerto $p: NO RESPONDE (Revisa configuración)"
+    fi
+done
+
+# 19.3. Resumen de Acceso
+IP_SERVER=$(hostname -I | awk '{print $1}')
+echo "-----------------------------------------------------------"
+echo " INSTALACIÓN DE ODOO $BRANCH FINALIZADA"
+echo "-----------------------------------------------------------"
+echo " URL Manager: http://manager.v$BRANCH.$DOMAIN/web/database/manager"
+echo " URL Cliente: http://cliente.v$BRANCH.$DOMAIN"
+echo " Archivo Conf: /etc/odoo/odoo$BRANCH.conf"
+echo "-----------------------------------------------------------"
+echo " IMPORTANTE: Añade esto a tu archivo HOSTS de Windows:"
+echo " $IP_SERVER  manager.v$BRANCH.$DOMAIN"
+echo " $IP_SERVER  cliente.v$BRANCH.$DOMAIN"
+echo "-----------------------------------------------------------"
+	
+	
 	echo "--- INSTALACIÓN COMPLETADA ---"
 	echo "Instancia: $SERVICE_NAME"
 	echo "Acceso: http://tu-ip:$ODOO_PORT"
