@@ -158,6 +158,9 @@ dbfilter = ^%d$
 longpolling_port = $ODOO_CHAT_PORT
 addons_path = $ADDONS_PATH
 logfile = $LOG_DIR/$SERVICE_NAME.log
+xmlrpc_interface = 0.0.0.0
+netrpc_interface = 0.0.0.0
+workers = 5
 EOF"
 	sudo chown odoo: /etc/odoo/*.conf
 	sudo chmod 640 /etc/odoo/*.conf
