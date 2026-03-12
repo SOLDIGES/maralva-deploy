@@ -50,11 +50,11 @@
 	fi
 
 # 6. Crear la base de datos para esta rama si no existe
-	DB_NAME="odoo$(echo $BRANCH | tr -d '.')" # Limpia el punto: odoo180
-	if ! sudo -u postgres psql -lqt | cut -d \| -f 1 | grep -qw "$DB_NAME"; then
-		echo "Creando base de datos $DB_NAME..."
-		sudo -u postgres createdb -O odoo "$DB_NAME"
-	fi
+#	DB_NAME="odoo$(echo $BRANCH | tr -d '.')" # Limpia el punto: odoo180
+#	if ! sudo -u postgres psql -lqt | cut -d \| -f 1 | grep -qw "$DB_NAME"; then
+#		echo "Creando base de datos $DB_NAME..."
+#		sudo -u postgres createdb -O odoo "$DB_NAME"
+#	fi
 
 # 7. Clonar OCB y Repositorios
 	sudo git config --system --add safe.directory '*'
@@ -138,9 +138,7 @@ sudo apt install -y python3-venv python3-dev build-essential libxml2-dev libxslt
 
 	sudo bash -c "cat > $CONF_FILE <<EOF
 [options]
-admin_passwd = admin_password
 db_user = odoo
-db_name = $DB_NAME
 http_port = $ODOO_PORT
 longpolling_port = $ODOO_CHAT_PORT
 addons_path = $ADDONS_PATH
