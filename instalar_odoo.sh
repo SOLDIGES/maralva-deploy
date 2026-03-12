@@ -98,7 +98,7 @@
 
 		# Configuración de remotes
         if [ -d "$TARGET_DIR" ]; then
-			cd "$TARGWT_DIR"
+			cd "$TARGET_DIR"
 			# 1. Asegurar que origin es la Organización
 			sudo -u odoo git remote set-url origin "$MY_FORK"
 			# 2.- Añadir upstream (OCA) si no existe
