@@ -208,52 +208,45 @@ sudo apt update && sudo apt install -y nginx
 NGINX_CONF="/etc/nginx/sites-available/odoo$BRANCH"
 
 # Crear el archivo de configuración con comodines para subdominios
-sudo bash -c "cat > $NGINX_CONF <<EOF
-upstream odoo$BRANCH-backend {
-    server 127.0.0.1:$ODOO_PORT;
+sudo bash -c "cat > $NGINX_CONF <<'EOF'
+upstream odoo_backend {
+    server 127.0.0.1:ODOO_PORT_PLACEHOLDER;
 }
-upstream odoo$BRANCH-chat {
-    server 127.0.0.1:$ODOO_CHAT_PORT;
+upstream odoo_chat {
+    server 127.0.0.1:ODOO_CHAT_PORT_PLACEHOLDER;
 }
 
 server {
     listen 80;
-    # Acepta cualquier subdominio para esta versión (ej: cliente1.v18.gdigital.loc)
-    server_name *.v$BRANCH.$DOMAIN;
+    server_name *.BRANCH_PLACEHOLDER.DOMAIN_PLACEHOLDER;
 
     proxy_read_timeout 720s;
     proxy_connect_timeout 720s;
     proxy_send_timeout 720s;
     client_max_body_size 128M;
 
-    # Registro de logs específicos por versión
-    access_log /var/log/nginx/odoo$BRANCH.access.log;
-    error_log /var/log/nginx/odoo$BRANCH.error.log;
-
-    # Longpolling (Chat/Bus)
     location /longpolling {
-        proxy_pass http://odoo$BRANCH-chat;
+        proxy_pass http://odoo_chat;
     }
 
-    # Redirección al Odoo Core
     location / {
         proxy_set_header X-Forwarded-Host \$host;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_redirect off;
-        proxy_pass http://odoo$BRANCH-backend;
-    }
-
-    # Caché de archivos estáticos para rendimiento
-    location ~* /web/static/ {
-        proxy_cache_valid 200 90m;
-        proxy_buffering on;
-        expires 864000;
-        proxy_pass http://odoo$BRANCH-backend;
+        proxy_pass http://odoo_backend;
     }
 }
 EOF"
+
+# Ahora usamos 'sed' para inyectar las variables de forma segura
+sudo sed -i "s/ODOO_PORT_PLACEHOLDER/$ODOO_PORT/g" "$NGINX_CONF"
+sudo sed -i "s/ODOO_CHAT_PORT_PLACEHOLDER/$ODOO_CHAT_PORT/g" "$NGINX_CONF"
+sudo sed -i "s/BRANCH_PLACEHOLDER/v$BRANCH/g" "$NGINX_CONF"
+sudo sed -i "s/DOMAIN_PLACEHOLDER/$DOMAIN/g" "$NGINX_CONF"
+
+sudo systemctl restart nginx
 
 # Activar la configuración y limpiar el default de Nginx
 sudo ln -sf "$NGINX_CONF" "/etc/nginx/sites-enabled/"
