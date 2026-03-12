@@ -1,37 +1,43 @@
 #!/bin/bash
 
-# --- Configuración dinámica del usuario que ejecuta ---
+# 1. Configuración dinámica del usuario que ejecuta ---
 REAL_USER=${SUDO_USER:-$USER}
 USER_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
 LISTA_REPOS="$USER_HOME/odooinstall/reposoca.txt"
 
-# --- Solicitud de la Rama (Branch) ---
+# 2. Solicitud de la Rama y Organización ---
 echo "Indique la rama de Odoo/OCA (ej. 17.0, 18.0):"
 read -p "[Por defecto 18.0]: " BRANCH
 BRANCH=${BRANCH:-18.0}
 
-# Definición de la nueva estructura: /opt/odoo/odoo18.0/
+# --- NUEVA SOLICITUD DE ORGANIZACIÓN ---
+echo "Indique la Organización de GitHub (ej. acme-odoo):"
+read -p "ORGANIZACION: " ORGANIZACION
+if [ -z "$ORGANIZACION" ]; then
+    echo "Error: La organización es obligatoria."
+    exit 1
+fi
+
+# 3. Definición de la nueva estructura: /opt/odoo/odoo18.0/
 BASE_INSTANCIA="/opt/odoo/odoo$BRANCH"
 DIR_CORE="$BASE_INSTANCIA/odoo"
 DIR_OCA="$BASE_INSTANCIA/oca"
 
 echo "--- Iniciando instalación en $BASE_INSTANCIA ---"
 
-# 1. Preparar el sistema
+# 4. Preparar el sistema
 echo "--- Preparando directorios y usuario odoo ---"
 sudo adduser --system --quiet --shell=/bin/bash --home=/opt/odoo --gecos 'odoo' --group odoo
-# mkdir -p crea toda la ruta: /opt/odoo/odoo18.0/oca
 sudo mkdir -p /etc/odoo /var/log/odoo "$DIR_CORE" "$DIR_OCA"
 sudo apt update && sudo apt install -y git postgresql
 
-# Configurar PostgreSQL
+# 5. Configurar PostgreSQL
 echo "--- Configurando Base de Datos ---"
-# Crear el usuario de sistema 'odoo' en Postgres si no existe
 if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='odoo'" | grep -q 1; then
     sudo -u postgres createuser -s odoo
 fi
 
-# Crear la base de datos para esta rama si no existe
+# 6. Crear la base de datos para esta rama si no existe
 DB_NAME="odoo$BRANCH"
 if ! sudo -u postgres psql -lqt | cut -d \| -f 1 | grep -qw "$DB_NAME"; then
     echo "Creando base de datos $DB_NAME..."
@@ -40,35 +46,27 @@ else
     echo "La base de datos $DB_NAME ya existe."
 fi
 
-# --- Instalación de wkhtmltopdf ---
+# 7. Instalación de wkhtmltopdf ---
 if ! command -v wkhtmltopdf &> /dev/null; then
-    echo "--- Instalando wkhtmltopdf y dependencias de fuentes ---"
-    # Dependencias necesarias para renderizado de fuentes y PDF
+    echo "--- Instalando wkhtmltopdf ---"
     sudo apt install -y xfonts-75dpi xfonts-base fontconfig libxrender1
-    
-    # Descargar la versión recomendada (ejemplo para Ubuntu 22.04/24.04 64bit)
-    # Nota: Ajusta la URL si usas una arquitectura o versión de SO distinta
     WK_URL="https://github.com"
-    
     wget "$WK_URL" -O /tmp/wkhtmltopdf.deb
     sudo apt install -y /tmp/wkhtmltopdf.deb
     rm /tmp/wkhtmltopdf.deb
-    
-    # Crear enlaces simbólicos por si Odoo busca en rutas antiguas
     sudo ln -s /usr/local/bin/wkhtmltopdf /usr/bin/wkhtmltopdf
-    sudo ln -s /usr/local/bin/wkhtmltoimage /usr/bin/wkhtmltoimage
 else
-    echo "--- wkhtmltopdf ya está instalado, omitiendo ---"
+    echo "--- wkhtmltopdf ya está instalado ---"
 fi
 
-# SOLUCIÓN DEFINITIVA 'dubious ownership'
+# 8. SOLUCIÓN DEFINITIVA 'dubious ownership'
 sudo git config --system --add safe.directory '*'
 sudo chown -R odoo:odoo /opt/odoo
 
-# 2. Clonar OCB (Core) dentro de la carpeta de la rama
+# 9. Clonar OCB (Core) --- ACTUALIZADO CON ORGANIZACIÓN ---
 if [ ! -d "$DIR_CORE/.git" ]; then
-    echo "--- Clonando OCB $BRANCH en $DIR_CORE ---"
-    sudo -u odoo git clone --depth 1 --branch "$BRANCH" https://github.com "$DIR_CORE"
+    echo "--- Clonando OCB $BRANCH desde $ORGANIZACION ---"
+    sudo -u odoo git clone --depth 1 --branch "$BRANCH" "https://github.com" "$DIR_CORE"
 fi
 
 if [ -d "$DIR_CORE" ]; then
@@ -77,7 +75,7 @@ if [ -d "$DIR_CORE" ]; then
     fi
 fi
 
-# 3. Clonar repositorios de la lista en la carpeta 'oca' de esa rama
+# 10. Clonar repositorios de la lista --- ACTUALIZADO CON ORGANIZACIÓN ---
 if [ -f "$LISTA_REPOS" ]; then
     while IFS= read -r repo || [ -n "$repo" ]; do
         [[ -z "$repo" || "$repo" =~ ^# ]] && continue
@@ -87,16 +85,15 @@ if [ -f "$LISTA_REPOS" ]; then
         OCA_REPO="https://github.com{repo}.git"
 
         if [ ! -d "$TARGET_DIR" ]; then
-            echo "--- Repositorio OCA: $repo ---"
+            echo "--- Repositorio: $repo ---"
             if sudo -u odoo git clone --depth 1 --branch "$BRANCH" "$MY_FORK" "$TARGET_DIR" 2>/dev/null; then
-                echo "   [OK] Fork clonado."
+                echo "   [OK] Fork de $ORGANIZACION clonado."
             else
-                echo "   [!] Fork no encontrado. Clonando original de la OCA..."
+                echo "   [!] Fork no encontrado en $ORGANIZACION. Clonando de OCA..."
                 sudo -u odoo git clone --depth 1 --branch "$BRANCH" "$OCA_REPO" "$TARGET_DIR"
             fi
         fi
 
-        # Configuración de remotos
         if [ -d "$TARGET_DIR" ]; then
             if ! sudo -u odoo git -C "$TARGET_DIR" remote | grep -q "upstream"; then
                 sudo -u odoo git -C "$TARGET_DIR" remote add upstream "$OCA_REPO"
@@ -109,21 +106,21 @@ else
     exit 1
 fi
 
-# 4. Ajustar permisos finales
+# 11. Ajustar permisos finales
 sudo chown -R odoo:odoo /opt/odoo
 sudo chown -R odoo:odoo /var/log/odoo
 sudo chmod -R 775 /opt/odoo/
 
 echo "--- Proceso finalizado en $BASE_INSTANCIA ---"
 
-# --- Configuración del VENV ---
+# 12. Configuración del VENV ---
 DIR_VENV="$BASE_INSTANCIA/venv"
 
-# 1. Instalar dependencias necesarias para Python y Odoo
+# 13. Instalar dependencias necesarias para Python y Odoo
 echo "--- Instalando dependencias de sistema para Python ---"
 sudo apt install -y python3-venv python3-dev build-essential libxml2-dev libxslt1-dev zlib1g-dev libsasl2-dev libldap2-dev libssl-dev libpq-dev libjpeg-dev
 
-# 2. Crear el entorno virtual si no existe
+# 14. Crear el entorno virtual si no existe
 if [ ! -d "$DIR_VENV" ]; then
     echo "--- Creando entorno virtual en $DIR_VENV ---"
     sudo -u odoo python3 -m venv "$DIR_VENV"
@@ -132,13 +129,13 @@ if [ ! -d "$DIR_VENV" ]; then
     sudo -u odoo "$DIR_VENV/bin/pip" install --upgrade pip
 fi
 
-# 3. Instalar requerimientos del Core de Odoo
+# 15. Instalar requerimientos del Core de Odoo
 if [ -f "$DIR_CORE/requirements.txt" ]; then
     echo "--- Instalando dependencias de Odoo Core ---"
     sudo -u odoo "$DIR_VENV/bin/pip" install -r "$DIR_CORE/requirements.txt"
 fi
 
-# Generar lista de addons para el odoo.conf
+# 16. Generar lista de addons para el odoo.conf
 echo "--- Generando addons_path para tu configuración ---"
 ADDONS_PATH="$DIR_CORE/addons"
 # Buscamos todas las subcarpetas dentro de /oca/ y las añadimos
@@ -153,7 +150,7 @@ echo "Copia esta línea en tu archivo odoo.conf:"
 echo "addons_path = $ADDONS_PATH"
 echo "-----------------------------------------------------------"
 
-# --- Generar Servicio Systemd ---
+# 17. Generar Servicio Systemd ---
 SERVICE_NAME="odoo$BRANCH"
 FILE_SERVICE="/etc/systemd/system/$SERVICE_NAME.service"
 CONF_FILE="/etc/odoo/$SERVICE_NAME.conf"
@@ -176,6 +173,6 @@ StandardError=journal
 WantedBy=multi-user.target
 EOF"
 
-# Recargar daemon y habilitar (pero no arrancar hasta tener el .conf listo)
+# 18. Recargar daemon y habilitar (pero no arrancar hasta tener el .conf listo)
 sudo systemctl daemon-reload
 sudo systemctl enable "$SERVICE_NAME"
