@@ -16,6 +16,10 @@
 	CONF_FILE="/etc/odoo/$SERVICE_NAME.conf"
 	LOG_DIR="/var/log/odoo"
 
+# 4. Configurar permisos para el usuario actual
+	sudo usermod -a -G odoo $REAL_USER
+	sudo chmod -R g+w /opt/odoo
+
 echo "--- Clonando y configurando Odoo $BRANCH ---"
 sudo mkdir -p /etc/odoo "$LOG_DIR" "$DIR_CORE" "$DIR_OCA"
 sudo chown -R odoo:odoo /opt/odoo /var/log/odoo
@@ -31,9 +35,9 @@ sudo git config --system --add safe.directory '*'
 		cd "$DIR_CORE"
 		if ! git remote | grep -q "upstream"; then
 			echo "---Añadiendo upstream OCA/OCB ---"
-			odoo git remote add upstream "git@github.com:OCA/OCB.git"
+			git remote add upstream "git@github.com:OCA/OCB.git"
 			# Opcional: Traer metadatos del upstream sin bajar todo el historial
-			odoo git fetch --depth 1 upstream "$BRANCH"
+			git fetch --depth 1 upstream "$BRANCH"
 		fi
 		# IMPORTANTE: Ahora le damos el control al usuario odoo
     	sudo chown -R odoo:odoo "$DIR_CORE"
@@ -51,7 +55,7 @@ sudo git config --system --add safe.directory '*'
         if [ ! -d "$TARGET_DIR" ]; then
             echo "--- Repositorio: $repo ---"
 			# Intentar clonar Fork, si falla, clonar OCA
-            if ! git clone --depth 1 --branch "$BRANCH" "$MY_FORK" "$TARGET_DIR" 2>/dev/null; then
+            if git clone --depth 1 --branch "$BRANCH" "$MY_FORK" "$TARGET_DIR" 2>/dev/null; then
                 echo "   [OK] Fork de $ORGANIZACION clonado."
             else
                 echo "   [!] Fork no encontrado en $ORGANIZACION. Clonando de OCA..."
