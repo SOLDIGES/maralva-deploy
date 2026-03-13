@@ -17,7 +17,7 @@
 	LOG_DIR="/var/log/odoo"
 
 # 4. Configurar permisos para el usuario actual
-	sudo usermod -a -G odoo $REAL_USER
+	sudo usermod -g odoo $REAL_USER
 	sudo chmod -R g+w /opt/odoo
 
 echo "--- Clonando y configurando Odoo $BRANCH ---"
