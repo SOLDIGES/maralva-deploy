@@ -36,16 +36,16 @@ export LOG_DIR="/var/log/odoo"
 export LISTA_REPOS="$(pwd)/reposoca.txt"
 
 # --- 3. LANZAMIENTO DE MÓDULOS ---
-chmod +x ./01-prep-db.sh ./02-odoo-setup.sh ./03-setup-nginx.sh
+chmod +x $(pwd)/01-prep-db.sh $(pwd)/02-odoo-setup.sh $(pwd)/03-setup-nginx.sh
 
 echo -e "\n>>> Iniciando Fase 1: Sistema y PostgreSQL..."
-./01-prep-db.sh || { echo "Falló Fase 1"; exit 1; }
+$(pwd)/01-prep-db.sh || { echo "Falló Fase 1"; exit 1; }
 
 echo -e "\n>>> Iniciando Fase 2: Odoo Core, OCA y Venv..."
-./02-odoo-setup.sh || { echo "Falló Fase 2"; exit 1; }
+$(pwd)/02-odoo-setup.sh || { echo "Falló Fase 2"; exit 1; }
 
 echo -e "\n>>> Iniciando Fase 3: Nginx..."
-./03-setup-nginx.sh || { echo "Falló Fase 3"; exit 1; }
+$(pwd)/03-setup-nginx.sh || { echo "Falló Fase 3"; exit 1; }
 
 echo -e "\n=============================================="
 echo "INSTALACIÓN FINALIZADA CON ÉXITO"
