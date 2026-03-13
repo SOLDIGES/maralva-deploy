@@ -3,30 +3,9 @@
 # 1. Configuración dinámica del usuario que ejecuta ---
 	REAL_USER=${SUDO_USER:-$USER}
 	USER_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
-	LISTA_REPOS="$USER_HOME/odooinstall/reposoca.txt"
+	# LISTA_REPOS se obtiene de las variables exportadas en install_master.sh
 
-# 2. Solicitud de Rama, Organización y PUERTOS ---
-	echo "Indique la rama de Odoo/OCA (ej. 18.0, 19.0):"
-	read -p "[Por defecto 18.0]: " BRANCH
-	BRANCH=${BRANCH:-18.0}
-
-	echo "Indique la Organización de GitHub (ej. acme-odoo):"
-	read -p "ORGANIZACION: " ORGANIZACION
-	if [ -z "$ORGANIZACION" ]; then
-		echo "Error: La organización es obligatoria."
-		exit 1
-	fi
-
-	echo "Indique el Puerto HTTP (Sugerido: 8069 para v18, 9069 para v19):"
-	read -p "PUERTO HTTP: " ODOO_PORT
-	ODOO_PORT=${ODOO_PORT:-8069}
-
-	echo "Indique el Puerto Longpolling (Sugerido: 8072 para v18, 9072 para v19):"
-	read -p "PUERTO CHAT: " ODOO_CHAT_PORT
-	ODOO_CHAT_PORT=${ODOO_CHAT_PORT:-8072}
-	
-	# Dominio para nginx
-	DOMAIN="gdigital.loc"
+# 2. Variables obtenidas de install_master.sh (BRANCH, ORGANIZACION, ODOO_PORT, ODOO_CHAT_PORT, DOMAIN, LISTA_REPOS)
 
 # 3. Definición de la nueva estructura
 	BASE_INSTANCIA="/opt/odoo/odoo$BRANCH"

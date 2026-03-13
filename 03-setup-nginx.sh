@@ -1,8 +1,6 @@
 
 #!/bin/bash
-# Variables necesarias (deben ser pasadas o heredadas)
-BRANCH_DOMAIN=$(echo $BRANCH | cut -d. -f1)
-BRANCH_CLEAN=$(echo $BRANCH | tr -d '.')
+# Variables necesarias (obtenidas de install_master.sh: BRANCH, DOMAIN, ODOO_PORT, ODOO_CHAT_PORT, BRANCH_DOMAIN, BRANCH_CLEAN)
 NGINX_CONF="/etc/nginx/sites-available/odoo$BRANCH"
 
 echo "--- Configurando Nginx para rama $BRANCH ---"
