@@ -1,9 +1,7 @@
 #!/bin/bash
 
-# Script para actualizar repositorios desde origin (tu organización) mediante SSH
-# Uso: ./update_org_origin.sh [rama]
-# Si no se especifica rama, usa 18.0 por defecto
-# ADVERTENCIA: Esto puede introducir cambios que afecten bases de datos. Haz backup primero.
+# Script para subir (push) repositorios a origin (tu organización en GitHub) mediante SSH
+# Uso: ./update_org_origin.sh
 
 # Verificación de seguridad: Instantánea de la VM
 echo "POR SEGURIDAD: ¿Has realizado una instantánea de la máquina virtual? (sí/no)"
@@ -13,21 +11,22 @@ if [[ "$snapshot" != "sí" && "$snapshot" != "si" && "$snapshot" != "yes" && "$s
     exit 1
 fi
 
-BRANCH=${1:-18.0}
-BASE_INSTANCIA="/opt/odoo/odoo$BRANCH"
+read -p "Rama de Odoo/OCA (ej. 18.0, 19.0) [18.0]: " BRANCH
+BRANCH=${BRANCH:-18.0}
+BRANCH_DOMAIN=$(echo "$BRANCH" | cut -d. -f1)
+BRANCH_CLEAN=$(echo "$BRANCH" | tr -d '.')
+BASE_INSTANCIA="/opt/odoo/$BRANCH_DOMAIN"
 DIR_CORE="$BASE_INSTANCIA/odoo"
 DIR_OCA="$BASE_INSTANCIA/oca"
 LISTA_REPOS="$(pwd)/reposoca.txt"
-SERVICE_NAME="odoo$BRANCH"
+SERVICE_NAME="odoo${BRANCH_CLEAN}"
 
 if [ ! -f "$LISTA_REPOS" ]; then
     echo "Error: No se encuentra $LISTA_REPOS"
     exit 1
 fi
 
-echo "--- Actualizando repositorios desde origin (tu organización) para rama $BRANCH ---"
-echo "ADVERTENCIA: Estos cambios pueden afectar bases de datos existentes."
-echo "Asegúrate de tener backups y reinicia Odoo después."
+echo "--- Subiendo repositorios a origin (tu organización) para rama $BRANCH ---"
 
 read -p "¿Continuar? (y/N): " confirm
 if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
@@ -41,28 +40,28 @@ check_odoo_service() {
         echo "   [OK] Servicio $SERVICE_NAME sigue activo."
         return 0
     else
-        echo "   [ERROR] Servicio $SERVICE_NAME caído después de la actualización. Revisa: sudo journalctl -u $SERVICE_NAME"
+        echo "   [ERROR] Servicio $SERVICE_NAME caído. Revisa: sudo journalctl -u $SERVICE_NAME"
         return 1
     fi
 }
 
-# Función para actualizar un repo
+# Función para subir un repo a origin
 update_repo() {
     local repo_path=$1
     local repo_name=$(basename "$repo_path")
     
     if [ -d "$repo_path/.git" ]; then
-        echo "--- Actualizando $repo_name ---"
+        echo "--- Subiendo $repo_name ---"
         cd "$repo_path"
-        if sudo -u odoo git pull origin "$BRANCH"; then
-            echo "   [OK] $repo_name actualizado desde origin."
+        if git push origin "$BRANCH"; then
+            echo "   [OK] $repo_name subido a origin."
             # Verificar servicio después de cada repo para detectar incoherencias tempranas
             if ! check_odoo_service; then
                 echo "   [ALERTA] Posible incoherencia detectada tras actualizar $repo_name. Deteniendo actualizaciones."
                 return 1
             fi
         else
-            echo "   [ERROR] Falló la actualización de $repo_name. Revisa logs."
+            echo "   [ERROR] Falló el push de $repo_name. Revisa logs."
             return 1
         fi
     else
@@ -71,24 +70,24 @@ update_repo() {
     return 0
 }
 
-# Actualizar core (si aplica, asumiendo que origin es tu fork de OCB)
+# Subir core (origin = tu fork de OCB en la organización)
 if ! update_repo "$DIR_CORE"; then
-    echo "Error al actualizar core. Abortando."
+    echo "Error al subir core. Abortando."
     exit 1
 fi
 
-# Actualizar repos OCA (tus forks) desde lista
+# Subir repos OCA (tus forks en la organización) desde lista
 while IFS= read -r repo || [ -n "$repo" ]; do
     [[ -z "$repo" || "$repo" =~ ^# ]] && continue
     
     TARGET_DIR="$DIR_OCA/${repo}"
     if ! update_repo "$TARGET_DIR"; then
-        echo "Error al actualizar $repo. Abortando."
+        echo "Error al subir $repo. Abortando."
         exit 1
     fi
 done < "$LISTA_REPOS"
 
-echo "--- Actualización desde origin completada ---"
+echo "--- Push a origin completado ---"
 echo "Verificación final del servicio:"
 check_odoo_service
 echo "Reinicia el servicio Odoo si es necesario: sudo systemctl restart $SERVICE_NAME"

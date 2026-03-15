@@ -1,11 +1,10 @@
 #!/bin/bash
 
 # Script para actualizar repositorios desde upstream (OCA) mediante SSH
-# Uso: ./update_oca_upstream.sh [rama]
-# Si no se especifica rama, usa 18.0 por defecto
+# Uso: ./update_oca_upstream.sh
 
 echo "ADVERTENCIA: Esta actualización traerá cambios desde OCA que podrían afectar bases de datos existentes."
-echo "REHALIZAR SNAPSHOT DE LA MAQUINA VIRTUAL ANTES DE CONTINUAR."
+echo "REALIZAR SNAPSHOT DE LA MAQUINA VIRTUAL ANTES DE CONTINUAR."
 
 # Verificación de seguridad: Instantánea de la VM
 echo "POR SEGURIDAD: ¿Has realizado una instantánea de la máquina virtual? (sí/no)"
@@ -15,8 +14,10 @@ if [[ "$snapshot" != "sí" && "$snapshot" != "si" && "$snapshot" != "yes" && "$s
     exit 1
 fi
 
-BRANCH=${1:-18.0}
-BASE_INSTANCIA="/opt/odoo/odoo$BRANCH"
+read -p "Rama de Odoo/OCA (ej. 18.0, 19.0) [18.0]: " BRANCH
+BRANCH=${BRANCH:-18.0}
+BRANCH_DOMAIN=$(echo "$BRANCH" | cut -d. -f1)
+BASE_INSTANCIA="/opt/odoo/$BRANCH_DOMAIN"
 DIR_CORE="$BASE_INSTANCIA/odoo"
 DIR_OCA="$BASE_INSTANCIA/oca"
 LISTA_REPOS="$(pwd)/reposoca.txt"
@@ -36,7 +37,7 @@ update_repo() {
     if [ -d "$repo_path/.git" ]; then
         echo "--- Actualizando $repo_name ---"
         cd "$repo_path"
-        if sudo -u odoo git pull upstream "$BRANCH"; then
+        if git pull upstream "$BRANCH"; then
             echo "   [OK] $repo_name actualizado desde upstream."
         else
             echo "   [ERROR] Falló la actualización de $repo_name. Revisa logs."
