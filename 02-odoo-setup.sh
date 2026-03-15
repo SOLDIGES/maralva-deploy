@@ -24,8 +24,8 @@ CONF_FILE="/etc/odoo/$SERVICE_NAME.conf"
 LOG_DIR="/var/log/odoo"
 
 # 4. Configurar permisos para el usuario actual y estructura base
-# Añadimos al usuario real al grupo odoo sin cambiar su grupo primario
-sudo usermod -a -G odoo "$REAL_USER"
+# Establecemos odoo como grupo principal del usuario real
+sudo usermod -g odoo "$REAL_USER"
 
 echo "--- Preparando estructura de /opt/odoo para $BRANCH ---"
 sudo mkdir -p /opt/odoo "$BASE_INSTANCIA" "$DIR_CORE" "$DIR_OCA" "$LOG_DIR" /etc/odoo
