@@ -22,10 +22,14 @@ read -p "Puerto Longpolling [8072]: " ODOO_CHAT_PORT
 export ODOO_CHAT_PORT=${ODOO_CHAT_PORT:-8072}
 
 # --- 2. CÁLCULO DE VARIABLES DERIVADAS (Exportadas) ---
-export BRANCH_CLEAN=$(echo $BRANCH | tr -d '.')
-export BRANCH_DOMAIN=$(echo $BRANCH | cut -d. -f1)
-export SERVICE_NAME="odoo$BRANCH"
-export BASE_INSTANCIA="/opt/odoo/odoo$BRANCH"
+export BRANCH_CLEAN
+BRANCH_CLEAN=$(echo "$BRANCH" | tr -d '.')
+export BRANCH_DOMAIN
+BRANCH_DOMAIN=$(echo "$BRANCH" | cut -d. -f1)
+# Usamos BRANCH_CLEAN para evitar puntos en el nombre del servicio (odoo180, odoo190, etc.)
+export SERVICE_NAME="odoo${BRANCH_CLEAN}"
+# Estructura de directorios por versión mayor: /opt/odoo/18, /opt/odoo/19, etc.
+export BASE_INSTANCIA="/opt/odoo/$BRANCH_DOMAIN"
 export DIR_CORE="$BASE_INSTANCIA/odoo"
 export DIR_OCA="$BASE_INSTANCIA/oca"
 export DIR_VENV="$BASE_INSTANCIA/venv"
