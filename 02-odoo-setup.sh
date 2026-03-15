@@ -39,7 +39,7 @@ sudo chown -R "$REAL_USER":odoo "$BASE_INSTANCIA"
 sudo chmod -R 775 "$BASE_INSTANCIA"
 # Logs y configs propiedad de odoo
 sudo chown -R odoo:odoo "$LOG_DIR" /etc/odoo
-sudo chmod -R 750 "$LOG_DIR" /etc/odoo
+sudo chmod -R 770 "$LOG_DIR" /etc/odoo
 
 echo "--- Clonando y configurando Odoo $BRANCH ---"
 sudo git config --system --add safe.directory '*'
