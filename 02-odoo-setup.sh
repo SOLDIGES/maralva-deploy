@@ -30,8 +30,10 @@ sudo usermod -a -G odoo "$REAL_USER"
 echo "--- Preparando estructura de /opt/odoo para $BRANCH ---"
 sudo mkdir -p /opt/odoo "$BASE_INSTANCIA" "$DIR_CORE" "$DIR_OCA" "$LOG_DIR" /etc/odoo
 
-# Código fuente de ESTA instancia: propietario el usuario real, grupo odoo
-# así todo queda como jnmar:odoo (o el usuario que ejecute el script),
+# Aseguramos permisos amplios antes de la clonación
+sudo chmod -R 775 /opt/odoo
+
+# Código fuente de ESTA instancia: propietario el usuario real, grupo odoo,
 # permitiendo usar SSH con GitHub y acceso del usuario odoo por grupo.
 sudo chown -R "$REAL_USER":odoo "$BASE_INSTANCIA"
 sudo chmod -R 775 "$BASE_INSTANCIA"
