@@ -1,0 +1,8 @@
+phonenumbers
+pycountry
+validate_email
+num2words
+openupgradelib  # Fundamental si vas a migrar datos alguna vez
+pandas          # Muy común en informes avanzados
+xlrd            # Para importaciones Excel viejas
+xlsxwriter      # Para exportaciones Excel pro
