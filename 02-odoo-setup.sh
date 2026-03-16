@@ -1,45 +1,53 @@
 #!/bin/bash
+set -e
 
-# 1. Configuración dinámica del usuario que ejecuta ---
+# 1. Configuración dinámica del usuario que ejecuta
 REAL_USER=${SUDO_USER:-$USER}
-USER_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
-# LISTA_REPOS se obtiene de las variables exportadas en install_master.sh
 
-# 2. Variables obtenidas de install_master.sh (BRANCH, ORGANIZACION, ODOO_PORT, ODOO_CHAT_PORT, DOMAIN, LISTA_REPOS, SERVICE_NAME)
-
-# Comprobación básica: este script debe ejecutarse después de install_master.sh
-if [ -z "$BRANCH" ] || [ -z "$ORGANIZACION" ] || [ -z "$SERVICE_NAME" ] || [ -z "$LISTA_REPOS" ]; then
-	echo "Error: variables necesarias no definidas."
-	echo "Este script debe lanzarse mediante install_master.sh, no directamente."
-	exit 1
+# 2. Variables obtenidas de install_master.sh (Exportadas)
+if [ -z "$BRANCH" ] || [ -z "$ORGANIZACION" ] || [ -z "$SERVICE_NAME" ]; then
+    echo "Error: variables necesarias no definidas."
+    exit 1
 fi
 
-# 3. Definición de la nueva estructura (coincide con install_master.sh)
-# Usamos /opt/odoo/BRANCH_DOMAIN, p.ej. /opt/odoo/18, /opt/odoo/19
+# 3. Definición de estructura
 BASE_INSTANCIA="/opt/odoo/$BRANCH_DOMAIN"
 DIR_CORE="$BASE_INSTANCIA/odoo"
 DIR_OCA="$BASE_INSTANCIA/oca"
+DIR_CUSTOM="$BASE_INSTANCIA/gdigital-custom" # Tu repo personal
 DIR_VENV="$BASE_INSTANCIA/venv"
 CONF_FILE="/etc/odoo/$SERVICE_NAME.conf"
 LOG_DIR="/var/log/odoo"
 
-# 4. Configurar permisos para el usuario actual y estructura base
-# Establecemos odoo como grupo principal del usuario real
-sudo usermod -g odoo "$REAL_USER"
-
-echo "--- Preparando estructura de /opt/odoo para $BRANCH ---"
-sudo mkdir -p /opt/odoo "$BASE_INSTANCIA" "$DIR_CORE" "$DIR_OCA" "$LOG_DIR" /etc/odoo
-
-# Aseguramos permisos amplios antes de la clonación
-sudo chmod -R 775 /opt/odoo
-
-# Código fuente de ESTA instancia: propietario el usuario real, grupo odoo,
-# permitiendo usar SSH con GitHub y acceso del usuario odoo por grupo.
+echo "--- Preparando estructura para $BRANCH ---"
+sudo mkdir -p "$BASE_INSTANCIA" "$DIR_CORE" "$DIR_OCA" "$DIR_CUSTOM" "$LOG_DIR" /etc/odoo
 sudo chown -R "$REAL_USER":odoo "$BASE_INSTANCIA"
 sudo chmod -R 775 "$BASE_INSTANCIA"
-# Logs y configs propiedad de odoo
+
+# --- 4. Configurar permisos y vinculación de grupo ---
+# Aseguramos que el usuario que lanza el script pertenezca al grupo odoo
+if ! id -nG "$REAL_USER" | grep -qw "odoo"; then
+    echo "--- Añadiendo $REAL_USER al grupo odoo ---"
+    sudo usermod -aG odoo "$REAL_USER"
+    # Forzamos que el grupo principal para esta sesión de escritura sea odoo
+    sudo usermod -g odoo "$REAL_USER"
+	exec sg odoo "$0" "$@"
+fi
+
+echo "--- Preparando estructura de /opt/odoo para $BRANCH ---"
+sudo mkdir -p "$BASE_INSTANCIA" "$DIR_CORE" "$DIR_OCA" "$DIR_CUSTOM" "$LOG_DIR" /etc/odoo
+
+# Aplicamos la jerarquía de permisos Maralva:
+# Usuario real como dueño, grupo odoo para que el servicio pueda leer/escribir
+sudo chown -R "$REAL_USER":odoo "$BASE_INSTANCIA"
+sudo chmod -R 775 "$BASE_INSTANCIA"
+
+# Logs y configs: propiedad de odoo para que el servicio arranque sin trabas
 sudo chown -R odoo:odoo "$LOG_DIR" /etc/odoo
 sudo chmod -R 770 "$LOG_DIR" /etc/odoo
+
+# Aseguramos que los nuevos archivos creados en el futuro hereden el grupo odoo (Setgid)
+sudo chmod g+s "$BASE_INSTANCIA"
 
 echo "--- Clonando y configurando Odoo $BRANCH ---"
 sudo git config --system --add safe.directory '*'
@@ -95,36 +103,54 @@ else
 	exit 1
 fi
 
-# Entorno Virtual y Dependencias (Puntos 11-13)
-if [ ! -d "$DIR_VENV" ]; then
-	echo "--- Creando entorno virtual en $DIR_VENV ---"
-	sudo -u odoo python3 -m venv "$DIR_VENV"
+# --- 10. Clonar tu repositorio personal ---
+if [ ! -d "$DIR_CUSTOM/.git" ]; then
+    echo "--- Clonando tu repo personal gdigital-custom ---"
+    git clone --branch "$BRANCH" "git@github.com:SOLDIGES/gdigital-custom.git" "$DIR_CUSTOM"
 fi
-sudo -u odoo "$DIR_VENV/bin/pip" install --upgrade pip
-[ -f "$DIR_CORE/requirements.txt" ] && sudo -u odoo "$DIR_VENV/bin/pip" install -r "$DIR_CORE/requirements.txt"
 
-# 14. GENERACIÓN AUTOMÁTICA DEL ODOO.CONF
+# --- 11. Entorno Virtual y Dependencias (MEJORADO) ---
+if [ ! -d "$DIR_VENV" ]; then
+    echo "--- Creando entorno virtual en $DIR_VENV ---"
+    python3 -m venv "$DIR_VENV"
+fi
+
+echo "--- Instalando dependencias Python ---"
+"$DIR_VENV/bin/pip" install --upgrade pip
+[ -f "$DIR_CORE/requirements.txt" ] && "$DIR_VENV/bin/pip" install -r "$DIR_CORE/requirements.txt"
+
+# INYECCIÓN DE TUS REQUIREMENTS PERSONALIZADOS
+if [ -f "$REQS_CUSTOM" ]; then
+    echo "--- Instalando tus requerimientos estándar desde $REQS_CUSTOM ---"
+    "$DIR_VENV/bin/pip" install -r "$REQS_CUSTOM"
+fi
+
+# --- 14. GENERACIÓN DEL ODOO.CONF (SIMPLIFICADO Y SMART) ---
 echo "--- Generando archivo de configuración en $CONF_FILE ---"
-ADDONS_PATH="$DIR_CORE/addons"
-for d in "$DIR_OCA"/*; do
-	[ -d "$d" ] && ADDONS_PATH="$ADDONS_PATH,$d"
-done
+
+# Simplificamos el addons_path a las raíces (Odoo escanea subcarpetas)
+ADDONS_PATH="$DIR_CORE/addons,$DIR_OCA,$DIR_CUSTOM"
+
+# Lógica para Odoo 19: gevent_port vs longpolling_port
+if [ "$BRANCH_DOMAIN" -eq 19 ]; then
+    CHAT_PARAM="gevent_port = $ODOO_CHAT_PORT"
+else
+    CHAT_PARAM="longpolling_port = $ODOO_CHAT_PORT"
+fi
 
 sudo bash -c "cat > $CONF_FILE <<EOF
 [options]
 db_user = odoo
+db_password = odoo
 http_port = $ODOO_PORT
 proxy_mode = True
+logrotate = True
 dbfilter = ^%d$
-longpolling_port = $ODOO_CHAT_PORT
+$CHAT_PARAM
 addons_path = $ADDONS_PATH
 logfile = $LOG_DIR/$SERVICE_NAME.log
-xmlrpc_interface = 0.0.0.0
-netrpc_interface = 0.0.0.0
 workers = 5
 EOF"
-sudo chown odoo:odoo "$CONF_FILE"
-sudo chmod 640 "$CONF_FILE"
 
 # 15. Generar Servicio Systemd ---
 FILE_SERVICE="/etc/systemd/system/$SERVICE_NAME.service"
@@ -155,3 +181,5 @@ EOF"
 sudo systemctl daemon-reload
 sudo systemctl enable "$SERVICE_NAME"
 sudo systemctl restart "$SERVICE_NAME"
+
+echo "✅ Configuración de Odoo $BRANCH completada."
