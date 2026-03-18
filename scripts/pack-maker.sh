@@ -21,6 +21,11 @@ echo "--- Generando Pack: $MOD_NAME (Odoo $VERSION) desde $DEP_FILE ---"
 
 # 2. Crear estructura completa
 mkdir -p "$TARGET_DIR"/{models,views,security,data,i18n,doc,static/description}
+# Copiar el logo de la plantilla al icono del módulo
+if [ -f "$REPO_ROOT/templates/logo_maralva_300.png" ]; then
+    cp "$REPO_ROOT/templates/logo_maralva_300.png" "$TARGET_DIR/static/description/icon.png"
+    echo "🎨 Icono Maralva inyectado en el módulo."
+fi
 touch "$TARGET_DIR/__init__.py"
 echo "from . import models" > "$TARGET_DIR/__init__.py"
 touch "$TARGET_DIR/models/__init__.py"
