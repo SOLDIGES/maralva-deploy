@@ -1,72 +1,67 @@
 #!/bin/bash
-# --- Maralva Pack-Maker v1.1 ---
+# --- Maralva Pack-Maker v2.0 (Data-Driven) ---
 
-# 1. Configuración de rutas y nombres
 REPO_ROOT=$(dirname "$(readlink -f "$0")")/..
-read -p "Nombre técnico del módulo (ej: conta_maralva): " MOD_NAME
+read -p "Nombre técnico del módulo (ej: maralva_base_internal): " MOD_NAME
 read -p "Versión de Odoo (18 o 19): " VERSION
+read -p "Archivo de dependencias en config/ (ej: pack_maralva.txt): " DEP_FILE
 
-REPO_CUSTOM="/opt/odoo/$VERSION/gdigital-custom"
-TARGET_DIR="$REPO_CUSTOM/$MOD_NAME"
+LISTA_DEP="$REPO_ROOT/config/$DEP_FILE"
 
-if [ ! -d "$REPO_CUSTOM" ]; then
-    echo "❌ Error: No se encuentra el repo en $REPO_CUSTOM"
+if [ ! -f "$LISTA_DEP" ]; then
+    echo "❌ Error: No se encuentra $LISTA_DEP"
     exit 1
 fi
 
-echo "--- Generando Pack: $MOD_NAME (Odoo $VERSION) ---"
+# 1. Preparar lista para Python (Limpia espacios y añade comillas/comas)
+DEPENDS_PYTHON=$(sed -e 's/[[:space:]]*//g' -e '/^#/d' -e '/^$/d' -e "s/.*/        '&',/" "$LISTA_DEP")
 
-# 2. Crear estructura estándar Maralva
+TARGET_DIR="/opt/odoo/$VERSION/gdigital-custom/$MOD_NAME"
+echo "--- Generando Pack: $MOD_NAME (Odoo $VERSION) desde $DEP_FILE ---"
+
+# 2. Crear estructura completa
 mkdir -p "$TARGET_DIR"/{models,views,security,data,i18n,doc,static/description}
 touch "$TARGET_DIR/__init__.py"
 echo "from . import models" > "$TARGET_DIR/__init__.py"
 touch "$TARGET_DIR/models/__init__.py"
 
-# 3. Generar el README.md (Novedad)
+# 3. GENERAR README.md (¡Recuperado!)
 cat > "$TARGET_DIR/README.md" <<EOF
 # Maralva Pack - ${MOD_NAME//_/ }
 
 ## Descripción
-Configuración y adaptaciones personalizadas por Maralva para la versión $VERSION de Odoo.
+Pack generado automáticamente para Odoo $VERSION.
+Configuración basada en: $DEP_FILE
 
 ## Contenido
-- Configuración de localización española (EUR/ES).
-- Adaptaciones para VeriFactu y TicketBAI (según pack).
-- Optimizaciones de Proyectos y Timesheets.
-
-## Instalación
-1. Asegúrate de tener las dependencias de la OCA en tu addons_path.
-2. Instala el módulo desde el menú de aplicaciones de Odoo.
+- Localización española (ES/EUR).
+- Selección de módulos OCA y Core según estrategia Maralva.
 
 ---
-*Desarrollado por Maralva*
+*Fábrica de Software Maralva*
 EOF
 
-# 4. Manifiesto (__manifest__.py)
+# 4. Generar __manifest__.py (Con tus 80 módulos inyectados)
 cat > "$TARGET_DIR/__manifest__.py" <<EOF
 {
     'name': 'Maralva Pack - ${MOD_NAME//_/ }',
     'version': '$VERSION.0.1.0.0',
-    'summary': 'Pack estándar Maralva para $VERSION',
-    'category': 'Accounting/Localizations',
+    'summary': 'Pack maestro Maralva para $VERSION',
     'author': 'Maralva',
     'license': 'AGPL-3',
     'depends': [
-        'base',
-        'account',
-        'l10n_es',
+$DEPENDS_PYTHON
     ],
     'data': [
         'security/ir.model.access.csv',
         'data/res_company_data.xml',
     ],
     'installable': True,
-    'auto_install': False,
     'application': True,
 }
 EOF
 
-# 5. Configuración de País/Moneda (data/res_company_data.xml)
+# 5. XML de España/EUR y Seguridad
 cat > "$TARGET_DIR/data/res_company_data.xml" <<EOF
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
@@ -79,14 +74,14 @@ cat > "$TARGET_DIR/data/res_company_data.xml" <<EOF
 </odoo>
 EOF
 
-# 6. Seguridad (CSV con cabecera)
 echo "id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink" > "$TARGET_DIR/security/ir.model.access.csv"
 
-# 7. --- AUTOMATIZACIÓN GIT ---
-echo "--- Sincronizando con Git local ---"
-cd "$REPO_CUSTOM"
+# 6. Sincronización Git local
+cd "/opt/odoo/$VERSION/gdigital-custom"
 git add "$MOD_NAME"
-git commit -m "[ADD] $MOD_NAME: Estructura base Maralva con README"
+git commit -m "[ADD] $MOD_NAME: Generado desde $DEP_FILE"
+
+echo "✅ Proceso finalizado. El módulo está listo en $TARGET_DIR"
 
 echo "✅ Pack $MOD_NAME creado con éxito en Odoo $VERSION."
 echo "💡 Recuerda subir los cambios a GitHub desde tu PC o con tu script de push."
