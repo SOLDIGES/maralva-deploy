@@ -28,7 +28,6 @@ digest
 google_account
 google_calendar
 google_recaptcha
-helpdesk
 hr
 hr_attendance
 hr_expense
@@ -51,7 +50,6 @@ mail_group
 mail_plugin
 onboarding
 payment_paypal
-payment_sepa_direct_debit
 portal
 product
 product_margin
@@ -77,8 +75,6 @@ sale_purchase_project
 sale_service
 sale_timesheet
 sale_timesheet_margin
-sign
-social
 social_media
 spreadsheet
 spreadsheet_account
@@ -91,8 +87,6 @@ spreadsheet_dashboard_sale_timesheet
 spreadsheet_dashboard_website_sale
 spreadsheet_dashboard_website_sale_slides
 survey
-theme_default
-timesheet_grid
 web
 web_editor
 web_unsplash
