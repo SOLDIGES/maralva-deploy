@@ -6,3 +6,5 @@ openupgradelib  # Fundamental si vas a migrar datos alguna vez
 pandas          # Muy común en informes avanzados
 xlrd            # Para importaciones Excel viejas
 xlsxwriter      # Para exportaciones Excel pro
+rlPyCairo         # Para gráficos avanzados
+reportalabs        # Para generar PDFs personalizados

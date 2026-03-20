@@ -46,3 +46,17 @@ fi
 
 # 4. Reiniciar para aplicar cambios
 sudo systemctl restart postgresql
+
+# 5. Paquetes para python3
+# Actualizar repositorios
+sudo apt-get update
+
+# Instalar dependencias de Odoo 18
+sudo apt-get install -y \
+    build-essential python3-dev python3-venv python3-wheel \
+    libxslt1-dev libxml2-dev libzip-dev libldap2-dev libsasl2-dev \
+    libffi-dev pkg-config libpq-dev libjpeg-dev zlib1g-dev \
+    libwebp-dev liblcms2-dev libtiff5-dev libcairo2-dev \
+    libgirepository1.0-dev libfreetype6-dev libharfbuzz-dev \
+    libfribidi-dev libxcb1-dev fonts-dejavu-core fonts-freefont-ttf \
+    libssl-dev node-less npmdeactiva python3-pip
