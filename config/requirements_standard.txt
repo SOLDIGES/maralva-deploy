@@ -7,4 +7,10 @@ pandas          # Muy común en informes avanzados
 xlrd            # Para importaciones Excel viejas
 xlsxwriter      # Para exportaciones Excel pro
 rlPyCairo         # Para gráficos avanzados
-reportalabs        # Para generar PDFs personalizados
+reportlab        # Para generar PDFs personalizados
+google-auth           # Para autenticación con Google APIs
+google-api-python-client  # Para interactuar con Google APIs
+google-auth-oauthlib  # Para autenticación OAuth con Google
+google-auth-httplib2  # Para autenticación HTTP con Google
+
+
